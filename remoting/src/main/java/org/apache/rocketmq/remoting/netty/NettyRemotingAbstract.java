@@ -58,11 +58,13 @@ public abstract class NettyRemotingAbstract {
     private static final Logger log = LoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
 
     /**
+     * 信号量单向限流
      * Semaphore to limit maximum number of on-going one-way requests, which protects system memory footprint.
      */
     protected final Semaphore semaphoreOneway;
 
     /**
+     * 信号量异步限流
      * Semaphore to limit maximum number of on-going asynchronous requests, which protects system memory footprint.
      */
     protected final Semaphore semaphoreAsync;
@@ -86,6 +88,7 @@ public abstract class NettyRemotingAbstract {
     protected final NettyEventExecutor nettyEventExecutor = new NettyEventExecutor();
 
     /**
+     * 默认请求处理器：处理没有匹配的请求码的请求
      * The default request processor to use in case there is no exact match in {@link #processorTable} per request code.
      */
     protected Pair<NettyRequestProcessor, ExecutorService> defaultRequestProcessor;

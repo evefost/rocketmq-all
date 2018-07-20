@@ -27,23 +27,27 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
 public interface RemotingServer extends RemotingService {
 
+    //同样注册处理器(命令处理器)，及执行线程池
     void registerProcessor(final int requestCode, final NettyRequestProcessor processor,
         final ExecutorService executor);
 
     void registerDefaultProcessor(final NettyRequestProcessor processor, final ExecutorService executor);
-
+    //本地监听端口，可用于扩展时用于，如broker 注册到nameserver肯定要用到这信息
     int localListenPort();
 
     Pair<NettyRequestProcessor, ExecutorService> getProcessorPair(final int requestCode);
 
+    //提供同步调用接口，以命令模式处理调用，channel直接用netty接口(绑死通信框架了)
     RemotingCommand invokeSync(final Channel channel, final RemotingCommand request,
         final long timeoutMillis) throws InterruptedException, RemotingSendRequestException,
         RemotingTimeoutException;
 
+    //提供异步调用
     void invokeAsync(final Channel channel, final RemotingCommand request, final long timeoutMillis,
         final InvokeCallback invokeCallback) throws InterruptedException,
         RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException;
 
+    //单向调用
     void invokeOneway(final Channel channel, final RemotingCommand request, final long timeoutMillis)
         throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException,
         RemotingSendRequestException;

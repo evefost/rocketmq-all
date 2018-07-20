@@ -27,22 +27,27 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
 public interface RemotingClient extends RemotingService {
 
+    //更新nameserver地址列表
     void updateNameServerAddressList(final List<String> addrs);
 
+    //获取nameserver地址列表，这些都由具体实现处理
     List<String> getNameServerAddressList();
 
+    //提供同步调用接口，以命令模式处理调用
     RemotingCommand invokeSync(final String addr, final RemotingCommand request,
         final long timeoutMillis) throws InterruptedException, RemotingConnectException,
         RemotingSendRequestException, RemotingTimeoutException;
 
+    //提供异步调用
     void invokeAsync(final String addr, final RemotingCommand request, final long timeoutMillis,
         final InvokeCallback invokeCallback) throws InterruptedException, RemotingConnectException,
         RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException;
-
+    //单向调用
     void invokeOneway(final String addr, final RemotingCommand request, final long timeoutMillis)
         throws InterruptedException, RemotingConnectException, RemotingTooMuchRequestException,
         RemotingTimeoutException, RemotingSendRequestException;
 
+    //注册处理器(命令处理器)，及执行线程池
     void registerProcessor(final int requestCode, final NettyRequestProcessor processor,
         final ExecutorService executor);
 

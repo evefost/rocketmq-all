@@ -72,7 +72,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     private static final Logger log = LoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
 
     private static final long LOCK_TIMEOUT_MILLIS = 3000;
-
+    //作为客户端配置信息:包含线程池配置及socket一些配置信息
     private final NettyClientConfig nettyClientConfig;
     private final Bootstrap bootstrap = new Bootstrap();
     private final EventLoopGroup eventLoopGroupWorker;
@@ -447,9 +447,11 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return null;
     }
 
+    //创建连接channel
     private Channel createChannel(final String addr) throws InterruptedException {
         ChannelWrapper cw = this.channelTables.get(addr);
         if (cw != null && cw.isOK()) {
+            //如已存在，则清除，随后再建
             cw.getChannel().close();
             channelTables.remove(addr);
         }
