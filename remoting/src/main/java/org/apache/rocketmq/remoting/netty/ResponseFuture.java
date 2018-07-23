@@ -71,6 +71,7 @@ public class ResponseFuture {
 
     public void putResponse(final RemotingCommand responseCommand) {
         this.responseCommand = responseCommand;
+        //收到远端返回的响应结果，中断阻塞让程序往下走
         this.countDownLatch.countDown();
     }
 

@@ -36,6 +36,7 @@ public class RemotingCommand {
     public static final String SERIALIZE_TYPE_ENV = "ROCKETMQ_SERIALIZE_TYPE";
     public static final String REMOTING_VERSION_KEY = "rocketmq.remoting.version";
     private static final Logger log = LoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
+    //请求类型
     private static final int RPC_TYPE = 0; // 0, REQUEST_COMMAND
     private static final int RPC_ONEWAY = 1; // 0, RPC
     private static final Map<Class<? extends CommandCustomHeader>, Field[]> CLASS_HASH_MAP =
@@ -218,6 +219,9 @@ public class RemotingCommand {
         return result;
     }
 
+    /**
+     * 标识为响应用（添加响应位）
+     */
     public void markResponseType() {
         int bits = 1 << RPC_TYPE;
         this.flag |= bits;
@@ -457,6 +461,10 @@ public class RemotingCommand {
         return RemotingCommandType.REQUEST_COMMAND;
     }
 
+    /**
+     * 未位为0，为请求，1为响应
+     * @return
+     */
     @JSONField(serialize = false)
     public boolean isResponseType() {
         int bits = 1 << RPC_TYPE;

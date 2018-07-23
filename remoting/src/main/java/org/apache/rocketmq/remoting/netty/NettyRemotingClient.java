@@ -74,43 +74,56 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     private static final long LOCK_TIMEOUT_MILLIS = 3000;
     //作为客户端配置信息:包含线程池配置及socket一些配置信息
     private final NettyClientConfig nettyClientConfig;
+    //netty 客户端启动类
     private final Bootstrap bootstrap = new Bootstrap();
+    //客户端事件轮询工作线程组
     private final EventLoopGroup eventLoopGroupWorker;
+    //控制 channelTables 访问安全
     private final Lock lockChannelTables = new ReentrantLock();
+    //为什么channel是多个的，集群时一个client 同时连接不同nameserver(一个nameserver只存一个连接)
     private final ConcurrentMap<String /* addr */, ChannelWrapper> channelTables = new ConcurrentHashMap<String, ChannelWrapper>();
 
     private final Timer timer = new Timer("ClientHouseKeepingService", true);
-
+    //nameserver 地址列表
     private final AtomicReference<List<String>> namesrvAddrList = new AtomicReference<List<String>>();
+    //选择连接到的nameserver地址
     private final AtomicReference<String> namesrvAddrChoosed = new AtomicReference<String>();
+    //为什么是个随机数
     private final AtomicInteger namesrvIndex = new AtomicInteger(initValueIndex());
     private final Lock lockNamesrvChannel = new ReentrantLock();
 
+    //公共处理线程池
     private final ExecutorService publicExecutor;
 
     /**
+     * 远端响应回调程序池
      * Invoke the callback methods in this executor when process response.
      */
     private ExecutorService callbackExecutor;
+    //自定义netty事件监听器
     private final ChannelEventListener channelEventListener;
+    //client 默认线程执行组
     private DefaultEventExecutorGroup defaultEventExecutorGroup;
+    //client rpc 执行钩子
     private RPCHook rpcHook;
 
     public NettyRemotingClient(final NettyClientConfig nettyClientConfig) {
         this(nettyClientConfig, null);
     }
 
+    //最基本的初始化工作
     public NettyRemotingClient(final NettyClientConfig nettyClientConfig,
         final ChannelEventListener channelEventListener) {
         super(nettyClientConfig.getClientOnewaySemaphoreValue(), nettyClientConfig.getClientAsyncSemaphoreValue());
         this.nettyClientConfig = nettyClientConfig;
         this.channelEventListener = channelEventListener;
-
+        //公共池的大小
         int publicThreadNums = nettyClientConfig.getClientCallbackExecutorThreads();
         if (publicThreadNums <= 0) {
             publicThreadNums = 4;
         }
 
+        //创建固定大小的公共池
         this.publicExecutor = Executors.newFixedThreadPool(publicThreadNums, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -119,7 +132,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 return new Thread(r, "NettyClientPublicExecutor_" + this.threadIndex.incrementAndGet());
             }
         });
-
+        //事件池就一个线程
         this.eventLoopGroupWorker = new NioEventLoopGroup(1, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -128,7 +141,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 return new Thread(r, String.format("NettyClientSelector_%d", this.threadIndex.incrementAndGet()));
             }
         });
-
+        //是否使用TLS 传输
         if (nettyClientConfig.isUseTLS()) {
             try {
                 sslContext = TlsHelper.buildSslContext(true);
@@ -148,8 +161,10 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return Math.abs(r.nextInt() % 999) % 999;
     }
 
+    //启动客户端
     @Override
     public void start() {
+        //创建默认事件执行线程组并指定池大小
         this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(
             nettyClientConfig.getClientWorkerThreads(),
             new ThreadFactory() {
@@ -161,18 +176,19 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                     return new Thread(r, "NettyClientWorkerThread_" + this.threadIndex.incrementAndGet());
                 }
             });
-
+        //绑定事件组及指定nio通信息方式
         Bootstrap handler = this.bootstrap.group(this.eventLoopGroupWorker).channel(NioSocketChannel.class)
-            .option(ChannelOption.TCP_NODELAY, true)
+            .option(ChannelOption.TCP_NODELAY, true)//不启用Nagle算法试图减小发包数量
             .option(ChannelOption.SO_KEEPALIVE, false)
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, nettyClientConfig.getConnectTimeoutMillis())
-            .option(ChannelOption.SO_SNDBUF, nettyClientConfig.getClientSocketSndBufSize())
-            .option(ChannelOption.SO_RCVBUF, nettyClientConfig.getClientSocketRcvBufSize())
+            .option(ChannelOption.SO_SNDBUF, nettyClientConfig.getClientSocketSndBufSize())//发送缓存大小(默认65535)
+            .option(ChannelOption.SO_RCVBUF, nettyClientConfig.getClientSocketRcvBufSize())//接收缓存大小
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 public void initChannel(SocketChannel ch) throws Exception {
                     ChannelPipeline pipeline = ch.pipeline();
                     if (nettyClientConfig.isUseTLS()) {
+                        //采用TLS 传输方式
                         if (null != sslContext) {
                             pipeline.addFirst(defaultEventExecutorGroup, "sslHandler", sslContext.newHandler(ch.alloc()));
                             log.info("Prepend SSL handler");
@@ -180,16 +196,18 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                             log.warn("Connections are insecure as SSLContext is null!");
                         }
                     }
+                    //添加各种处理器，并指定运行在那个线程组
                     pipeline.addLast(
                         defaultEventExecutorGroup,
                         new NettyEncoder(),
                         new NettyDecoder(),
+                        //空闲装态触发器
                         new IdleStateHandler(0, 0, nettyClientConfig.getClientChannelMaxIdleTimeSeconds()),
                         new NettyConnectManageHandler(),
                         new NettyClientHandler());
                 }
             });
-
+        //定时扫描请求响应表，清除过期无效的请求信息
         this.timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -206,6 +224,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //停机清理工作
     @Override
     public void shutdown() {
         try {
@@ -239,6 +258,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //关闭channle 清理相关连接信息
     public void closeChannel(final String addr, final Channel channel) {
         if (null == channel)
             return;
@@ -286,6 +306,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         this.rpcHook = rpcHook;
     }
 
+    //关闭channle 并做一些清理工作
     public void closeChannel(final Channel channel) {
         if (null == channel)
             return;
@@ -357,9 +378,11 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //同步调用外层实现
     @Override
     public RemotingCommand invokeSync(String addr, final RemotingCommand request, long timeoutMillis)
         throws InterruptedException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException {
+        //获取要消息的服务器channel
         final Channel channel = this.getAndCreateChannel(addr);
         if (channel != null && channel.isActive()) {
             try {
@@ -389,6 +412,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //获取或创建channel
     private Channel getAndCreateChannel(final String addr) throws InterruptedException {
         if (null == addr)
             return getAndCreateNameserverChannel();
@@ -401,6 +425,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return this.createChannel(addr);
     }
 
+    //创建连接nameserver的channel
     private Channel getAndCreateNameserverChannel() throws InterruptedException {
         String addr = this.namesrvAddrChoosed.get();
         if (addr != null) {
@@ -455,7 +480,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
             cw.getChannel().close();
             channelTables.remove(addr);
         }
-
+        //控制并发
         if (this.lockChannelTables.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
             try {
                 boolean createNewConnection;
@@ -467,6 +492,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                         this.channelTables.remove(addr);
                         createNewConnection = true;
                     } else if (!cw.getChannelFuture().isDone()) {
+                        //新一channel正在创建还没完成
                         createNewConnection = false;
                     } else {
                         this.channelTables.remove(addr);
@@ -477,6 +503,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 }
 
                 if (createNewConnection) {
+                    //创建新的channel
                     ChannelFuture channelFuture = this.bootstrap.connect(RemotingHelper.string2SocketAddress(addr));
                     log.info("createChannel: begin to connect remote host[{}] asynchronously", addr);
                     cw = new ChannelWrapper(channelFuture);
@@ -492,6 +519,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
 
         if (cw != null) {
+            //获取连接结果
             ChannelFuture channelFuture = cw.getChannelFuture();
             if (channelFuture.awaitUninterruptibly(this.nettyClientConfig.getConnectTimeoutMillis())) {
                 if (cw.isOK()) {
@@ -509,10 +537,12 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return null;
     }
 
+    //异步调用外层实现
     @Override
     public void invokeAsync(String addr, RemotingCommand request, long timeoutMillis, InvokeCallback invokeCallback)
         throws InterruptedException, RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException,
         RemotingSendRequestException {
+        //获取要消息的服务器channel
         final Channel channel = this.getAndCreateChannel(addr);
         if (channel != null && channel.isActive()) {
             try {
@@ -531,6 +561,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //单向发送外层实现
     @Override
     public void invokeOneway(String addr, RemotingCommand request, long timeoutMillis) throws InterruptedException,
         RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
@@ -552,6 +583,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //注册处理器
     @Override
     public void registerProcessor(int requestCode, NettyRequestProcessor processor, ExecutorService executor) {
         ExecutorService executorThis = executor;
@@ -629,6 +661,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    //连接管理
     class NettyConnectManageHandler extends ChannelDuplexHandler {
         @Override
         public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress,
@@ -671,8 +704,10 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
             if (evt instanceof IdleStateEvent) {
+                //空闲事件
                 IdleStateEvent event = (IdleStateEvent) evt;
                 if (event.state().equals(IdleState.ALL_IDLE)) {
+                    //读写都空闲，关闭channel
                     final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());
                     log.warn("NETTY CLIENT PIPELINE: IDLE exception [{}]", remoteAddress);
                     closeChannel(ctx.channel());
@@ -682,7 +717,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                     }
                 }
             }
-
+            //继续传递事件
             ctx.fireUserEventTriggered(evt);
         }
 

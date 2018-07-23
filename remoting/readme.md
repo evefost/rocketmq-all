@@ -7,8 +7,9 @@
 RemotingService 顶层接口，抽出server及client共有的
   RemotingClient 
   RemotingServer
-  NettyRemotingAbstract //抽象层
-    NettyRemotingClient //实现
+  NettyRemotingAbstract 
+    //抽取server与 client 共有的实现，如限流，请求处器处理，响应处理
+    NettyRemotingClient 
     NettyRemotingServer
   
 
