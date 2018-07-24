@@ -37,20 +37,22 @@ import org.slf4j.LoggerFactory;
 
 public class NamesrvController {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
-
+    //namesrv配置
     private final NamesrvConfig namesrvConfig;
 
     private final NettyServerConfig nettyServerConfig;
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "NSScheduledThread"));
+    //用于管理namesrv相关配置
     private final KVConfigManager kvConfigManager;
+    //路由信息管理器
     private final RouteInfoManager routeInfoManager;
-
+    //nio 服务端
     private RemotingServer remotingServer;
-
+   //作为一个channel监听器，监听bocker 接入状态
     private BrokerHousekeepingService brokerHousekeepingService;
-
+    //服务端消息事件处理线程池
     private ExecutorService remotingExecutor;
 
     private Configuration configuration;
@@ -67,18 +69,18 @@ public class NamesrvController {
         );
         this.configuration.setStorePathFromConfig(this.namesrvConfig, "configStorePath");
     }
-
+    //初始化配置信息后，接下来就是启动server了，启动server在remote模块已分析过了
     public boolean initialize() {
-
+        //加载namesrv相关配置
         this.kvConfigManager.load();
-
+        //创建socketserver并塞入channel事件监听器
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
 
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
 
         this.registerProcessor();
-
+        //定时10s扫描出不失活的broker 并清除
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -97,7 +99,7 @@ public class NamesrvController {
 
         return true;
     }
-
+    //注册default处理器（核心处理在DefaultRequestProcessor）
     private void registerProcessor() {
         if (namesrvConfig.isClusterTest()) {
 

@@ -51,7 +51,7 @@ public class BrokerOuterAPI {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final RemotingClient remotingClient;
     private final TopAddressing topAddressing = new TopAddressing(MixAll.getWSAddr());
-    private String nameSrvAddr = null;
+    private String nameSrvAddr = "127.0.0.1:9876";
 
     public BrokerOuterAPI(final NettyClientConfig nettyClientConfig) {
         this(nettyClientConfig, null);
@@ -113,6 +113,7 @@ public class BrokerOuterAPI {
         if (nameServerAddressList != null) {
             for (String namesrvAddr : nameServerAddressList) {
                 try {
+                    //真正开始发送broker注册command
                     RegisterBrokerResult result = this.registerBroker(namesrvAddr, clusterName, brokerAddr, brokerName, brokerId,
                         haServerAddr, topicConfigWrapper, filterServerList, oneway, timeoutMills);
                     if (result != null) {

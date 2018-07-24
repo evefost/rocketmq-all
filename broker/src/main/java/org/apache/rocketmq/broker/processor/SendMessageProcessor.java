@@ -65,23 +65,28 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         SendMessageContext mqtraceContext;
         switch (request.getCode()) {
             case RequestCode.CONSUMER_SEND_MSG_BACK:
+                //消费都发回的消息
                 return this.consumerSendMsgBack(ctx, request);
             default:
+                //生产端发送的消息
                 SendMessageRequestHeader requestHeader = parseRequestHeader(request);
                 if (requestHeader == null) {
                     return null;
                 }
-
+                //构建消息context
                 mqtraceContext = buildMsgContext(ctx, requestHeader);
+                //消息处理前回调hook 列表
                 this.executeSendMessageHookBefore(ctx, request, mqtraceContext);
 
                 RemotingCommand response;
                 if (requestHeader.isBatch()) {
+                    //批量消息处理
                     response = this.sendBatchMessage(ctx, request, mqtraceContext, requestHeader);
                 } else {
+                    //单条消息处理
                     response = this.sendMessage(ctx, request, mqtraceContext, requestHeader);
                 }
-
+                //消息处理后回调hook 列表
                 this.executeSendMessageHookAfter(response, mqtraceContext);
                 return response;
         }
@@ -290,14 +295,15 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         return true;
     }
 
+    //处理单条生产消息
     private RemotingCommand sendMessage(final ChannelHandlerContext ctx,
         final RemotingCommand request,
         final SendMessageContext sendMessageContext,
         final SendMessageRequestHeader requestHeader) throws RemotingCommandException {
-
+        //创建响应command
         final RemotingCommand response = RemotingCommand.createResponseCommand(SendMessageResponseHeader.class);
         final SendMessageResponseHeader responseHeader = (SendMessageResponseHeader) response.readCustomHeader();
-
+        //回写opaque,以便client 据此opaque识那条消息的回应
         response.setOpaque(request.getOpaque());
 
         response.addExtField(MessageConst.PROPERTY_MSG_REGION, this.brokerController.getBrokerConfig().getRegionId());
@@ -313,10 +319,12 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         }
 
         response.setCode(-1);
+        //校验消息
         super.msgCheck(ctx, requestHeader, response);
         if (response.getCode() != -1) {
             return response;
         }
+        //消息校验通过，后续消息的各种处理
 
         final byte[] body = request.getBody();
 
@@ -353,9 +361,9 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                 return response;
             }
         }
-
+        //消息交给MessageStore 服务 处理（执行保存，同步到slave）
         PutMessageResult putMessageResult = this.brokerController.getMessageStore().putMessage(msgInner);
-
+        //处理保存结果
         return handlePutMessageResult(putMessageResult, response, request, msgInner, responseHeader, sendMessageContext, ctx, queueIdInt);
 
     }
@@ -365,6 +373,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         SendMessageResponseHeader responseHeader, SendMessageContext sendMessageContext, ChannelHandlerContext ctx,
         int queueIdInt) {
         if (putMessageResult == null) {
+            //保存有问题，返回响应系统错误
             response.setCode(ResponseCode.SYSTEM_ERROR);
             response.setRemark("store putMessage return null");
             return response;
@@ -373,19 +382,19 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         switch (putMessageResult.getPutMessageStatus()) {
             // Success
-            case PUT_OK:
+            case PUT_OK://保存成功
                 sendOK = true;
                 response.setCode(ResponseCode.SUCCESS);
                 break;
-            case FLUSH_DISK_TIMEOUT:
+            case FLUSH_DISK_TIMEOUT://刷盘超时
                 response.setCode(ResponseCode.FLUSH_DISK_TIMEOUT);
                 sendOK = true;
                 break;
-            case FLUSH_SLAVE_TIMEOUT:
+            case FLUSH_SLAVE_TIMEOUT://刷到slave超时
                 response.setCode(ResponseCode.FLUSH_SLAVE_TIMEOUT);
                 sendOK = true;
                 break;
-            case SLAVE_NOT_AVAILABLE:
+            case SLAVE_NOT_AVAILABLE: //slave节点无效
                 response.setCode(ResponseCode.SLAVE_NOT_AVAILABLE);
                 sendOK = true;
                 break;

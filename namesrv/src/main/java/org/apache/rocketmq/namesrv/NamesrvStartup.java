@@ -38,7 +38,11 @@ import org.apache.rocketmq.srvutil.ShutdownHookThread;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * nameserver 启动类
+ */
 public class NamesrvStartup {
+    private static final Logger log = LoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
     public static Properties properties = null;
     public static CommandLine commandLine = null;
 
@@ -47,10 +51,13 @@ public class NamesrvStartup {
     }
 
     public static NamesrvController main0(String[] args) {
+        String configPaht = "D:/workspace2/rocketmq/distribution";
+        System.setProperty("rocketmq.home.dir",configPaht);
+
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
         try {
             //PackageConflictDetect.detectFastjson();
-
+            //构建命令选项
             Options options = ServerUtil.buildCommandlineOptions(new Options());
             commandLine = ServerUtil.parseCmdLine("mqnamesrv", args, buildCommandlineOptions(options), new PosixParser());
             if (null == commandLine) {
@@ -60,6 +67,7 @@ public class NamesrvStartup {
 
             final NamesrvConfig namesrvConfig = new NamesrvConfig();
             final NettyServerConfig nettyServerConfig = new NettyServerConfig();
+            //设置服务监听端口
             nettyServerConfig.setListenPort(9876);
             if (commandLine.hasOption('c')) {
                 String file = commandLine.getOptionValue('c');
@@ -104,27 +112,28 @@ public class NamesrvStartup {
 
             // remember all configs to prevent discard
             controller.getConfiguration().registerConfig(properties);
-
+            //初始化
             boolean initResult = controller.initialize();
             if (!initResult) {
                 controller.shutdown();
                 System.exit(-3);
             }
-
+            //添加运行关闭钩子
             Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable<Void>() {
                 @Override
                 public Void call() throws Exception {
+                    //关闭nameserver
                     controller.shutdown();
                     return null;
                 }
             }));
-
+            //开始启动服务端
             controller.start();
 
             String tip = "The Name Server boot success. serializeType=" + RemotingCommand.getSerializeTypeConfigInThisServer();
             log.info(tip);
             System.out.printf(tip + "%n");
-
+            log.info("nameserver 启动成功");
             return controller;
         } catch (Throwable e) {
             e.printStackTrace();
@@ -134,6 +143,7 @@ public class NamesrvStartup {
         return null;
     }
 
+    //构建命令选项
     public static Options buildCommandlineOptions(final Options options) {
         Option opt = new Option("c", "configFile", true, "Name server config properties file");
         opt.setRequired(false);

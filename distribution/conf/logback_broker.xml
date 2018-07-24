@@ -268,6 +268,7 @@
     <logger name="RocketmqBroker" additivity="false">
         <level value="INFO"/>
         <appender-ref ref="RocketmqBrokerAppender"/>
+        <appender-ref ref="STDOUT"/>
     </logger>
 
     <logger name="RocketmqProtection" additivity="false">
@@ -325,10 +326,10 @@
         <appender-ref ref="RocketmqFilterAppender"/>
     </logger>
 
-    <logger name="RocketmqConsole" additivity="false">
-        <level value="INFO"/>
-        <appender-ref ref="STDOUT"/>
-    </logger>
+    <!--<logger name="RocketmqConsole" additivity="false">-->
+        <!--<level value="INFO"/>-->
+        <!--<appender-ref ref="STDOUT"/>-->
+    <!--</logger>-->
 
     <root>
         <level value="INFO"/>

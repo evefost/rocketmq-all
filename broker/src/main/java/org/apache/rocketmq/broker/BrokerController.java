@@ -108,6 +108,7 @@ public class BrokerController {
     private final SubscriptionGroupManager subscriptionGroupManager;
     private final ConsumerIdsChangeListener consumerIdsChangeListener;
     private final RebalanceLockManager rebalanceLockManager = new RebalanceLockManager();
+    //nettyclient 连接到namesrv
     private final BrokerOuterAPI brokerOuterAPI;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "BrokerControllerScheduledThread"));
@@ -198,14 +199,15 @@ public class BrokerController {
     }
 
     public boolean initialize() throws CloneNotSupportedException {
+        //加载
         boolean result = this.topicConfigManager.load();
-
         result = result && this.consumerOffsetManager.load();
         result = result && this.subscriptionGroupManager.load();
         result = result && this.consumerFilterManager.load();
 
         if (result) {
             try {
+                //创建消息管理服务(保存、同步到slave)
                 this.messageStore =
                     new DefaultMessageStore(this.messageStoreConfig, this.brokerStatsManager, this.messageArrivingListener,
                         this.brokerConfig);
@@ -223,10 +225,12 @@ public class BrokerController {
         result = result && this.messageStore.load();
 
         if (result) {
+            //创建nettyserver(与处理consumer,producer消息请求)
             this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.clientHousekeepingService);
             NettyServerConfig fastConfig = (NettyServerConfig) this.nettyServerConfig.clone();
             fastConfig.setListenPort(nettyServerConfig.getListenPort() - 2);
             this.fastRemotingServer = new NettyRemotingServer(fastConfig, this.clientHousekeepingService);
+            //分各种池，独立处理不同功能
             this.sendMessageExecutor = new BrokerFixedThreadPoolExecutor(
                 this.brokerConfig.getSendMessageThreadPoolNums(),
                 this.brokerConfig.getSendMessageThreadPoolNums(),
@@ -338,6 +342,7 @@ public class BrokerController {
                 }
             }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
 
+            //更新namesrv地址列表，以便接下来brokerOuterAPI 通过nettyclient把自身注册到namesrv上去
             if (this.brokerConfig.getNamesrvAddr() != null) {
                 this.brokerOuterAPI.updateNameServerAddressList(this.brokerConfig.getNamesrvAddr());
                 log.info("Set user specified name server address: {}", this.brokerConfig.getNamesrvAddr());
@@ -394,12 +399,15 @@ public class BrokerController {
 
     public void registerProcessor() {
         /**
+         * 创建发送消息处理器，并注册相应的请求处理码
          * SendMessageProcessor
          */
         SendMessageProcessor sendProcessor = new SendMessageProcessor(this);
+        //注册发送钩子列表
         sendProcessor.registerSendMessageHook(sendMessageHookList);
+        //注册消费钩子列表
         sendProcessor.registerConsumeMessageHook(consumeMessageHookList);
-
+        //注册以下请求码都使用上面创建的消息处理器
         this.remotingServer.registerProcessor(RequestCode.SEND_MESSAGE, sendProcessor, this.sendMessageExecutor);
         this.remotingServer.registerProcessor(RequestCode.SEND_MESSAGE_V2, sendProcessor, this.sendMessageExecutor);
         this.remotingServer.registerProcessor(RequestCode.SEND_BATCH_MESSAGE, sendProcessor, this.sendMessageExecutor);
@@ -651,18 +659,22 @@ public class BrokerController {
 
     public void start() throws Exception {
         if (this.messageStore != null) {
+            //启动消息在保存服务
             this.messageStore.start();
         }
 
         if (this.remotingServer != null) {
+            //启动consumer ,producer 接入服务
             this.remotingServer.start();
         }
 
         if (this.fastRemotingServer != null) {
+            //这个暂时不知做什么???
             this.fastRemotingServer.start();
         }
 
         if (this.brokerOuterAPI != null) {
+            //启动nettyclient,用于将自身信息注册到namesrv
             this.brokerOuterAPI.start();
         }
 
@@ -677,9 +689,9 @@ public class BrokerController {
         if (this.filterServerManager != null) {
             this.filterServerManager.start();
         }
-
+        //注册broker到nameserver
         this.registerBrokerAll(true, false);
-
+        //定时更自身信息namesrv
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -693,10 +705,12 @@ public class BrokerController {
         }, 1000 * 10, 1000 * 30, TimeUnit.MILLISECONDS);
 
         if (this.brokerStatsManager != null) {
+            //启动broker 统计管理
             this.brokerStatsManager.start();
         }
 
         if (this.brokerFastFailure != null) {
+            //???
             this.brokerFastFailure.start();
         }
     }
@@ -715,7 +729,7 @@ public class BrokerController {
             }
             topicConfigWrapper.setTopicConfigTable(topicConfigTable);
         }
-
+        //准备完了，开始注册
         RegisterBrokerResult registerBrokerResult = this.brokerOuterAPI.registerBrokerAll(
             this.brokerConfig.getBrokerClusterName(),
             this.getBrokerAddr(),

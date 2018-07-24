@@ -67,7 +67,7 @@ public abstract class AbstractSendMessageProcessor implements NettyRequestProces
             new InetSocketAddress(brokerController.getBrokerConfig().getBrokerIP1(), brokerController
                 .getNettyServerConfig().getListenPort());
     }
-
+    //构建消息context
     protected SendMessageContext buildMsgContext(ChannelHandlerContext ctx,
         SendMessageRequestHeader requestHeader) {
         if (!this.hasSendMessageHook()) {

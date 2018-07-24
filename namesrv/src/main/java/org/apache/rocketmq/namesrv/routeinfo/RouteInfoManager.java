@@ -49,10 +49,15 @@ public class RouteInfoManager {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
     private final static long BROKER_CHANNEL_EXPIRED_TIME = 1000 * 60 * 2;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    //主题与队列数据关系表：一个主题有多个队列
     private final HashMap<String/* topic */, List<QueueData>> topicQueueTable;
+    //broker名称与broker属性
     private final HashMap<String/* brokerName */, BrokerData> brokerAddrTable;
+    //集群名称与brokerName的关系
     private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable;
+    //活跃broker实例表，不活跃的broker实例会被定时扫描清除
     private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable;
+    //broker实例对应的过滤器
     private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
     public RouteInfoManager() {
@@ -104,7 +109,7 @@ public class RouteInfoManager {
         final String brokerAddr,
         final String brokerName,
         final long brokerId,
-        final String haServerAddr,
+        final String haServerAddr,//这个地址干什么用？
         final TopicConfigSerializeWrapper topicConfigWrapper,
         final List<String> filterServerList,
         final Channel channel) {
@@ -128,11 +133,13 @@ public class RouteInfoManager {
                     brokerData = new BrokerData(clusterName, brokerName, new HashMap<Long, String>());
                     this.brokerAddrTable.put(brokerName, brokerData);
                 }
+                //如果brokerId一样会被覆盖
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
-
+                //主题配置不为空，且为master节点
                 if (null != topicConfigWrapper
                     && MixAll.MASTER_ID == brokerId) {
+                    //如果broker topic配置有变化，或首次注册上来，创建和更新队列信息
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
                         || registerFirst) {
                         ConcurrentMap<String, TopicConfig> tcTable =
@@ -144,7 +151,7 @@ public class RouteInfoManager {
                         }
                     }
                 }
-
+                //保存或更新到活跃表中
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -154,7 +161,7 @@ public class RouteInfoManager {
                 if (null == prevBrokerLiveInfo) {
                     log.info("new broker registered, {} HAServer: {}", brokerAddr, haServerAddr);
                 }
-
+                //处理过滤器信息
                 if (filterServerList != null) {
                     if (filterServerList.isEmpty()) {
                         this.filterServerTable.remove(brokerAddr);
@@ -162,8 +169,9 @@ public class RouteInfoManager {
                         this.filterServerTable.put(brokerAddr, filterServerList);
                     }
                 }
-
+                //marterbrokerId =0
                 if (MixAll.MASTER_ID != brokerId) {
+                    //非marter 节点，获取master 节点地址返回
                     String masterAddr = brokerData.getBrokerAddrs().get(MixAll.MASTER_ID);
                     if (masterAddr != null) {
                         BrokerLiveInfo brokerLiveInfo = this.brokerLiveTable.get(masterAddr);
@@ -733,6 +741,7 @@ public class RouteInfoManager {
 }
 
 class BrokerLiveInfo {
+    //最后更新时间，用于判断是否为活跃实例 依据
     private long lastUpdateTimestamp;
     private DataVersion dataVersion;
     private Channel channel;

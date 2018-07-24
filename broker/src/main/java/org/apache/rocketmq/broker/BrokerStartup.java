@@ -47,10 +47,11 @@ import org.slf4j.LoggerFactory;
 import static org.apache.rocketmq.remoting.netty.TlsSystemConfig.TLS_ENABLE;
 
 public class BrokerStartup {
+
     public static Properties properties = null;
     public static CommandLine commandLine = null;
     public static String configFile = null;
-    public static Logger log;
+    private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
 
     public static void main(String[] args) {
         start(createBrokerController(args));
@@ -79,6 +80,8 @@ public class BrokerStartup {
     }
 
     public static BrokerController createBrokerController(String[] args) {
+        String configPaht = "D:/workspace2/rocketmq/distribution";
+        System.setProperty("rocketmq.home.dir",configPaht);
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
 
         if (null == System.getProperty(NettySystemConfig.COM_ROCKETMQ_REMOTING_SOCKET_SNDBUF_SIZE)) {
@@ -138,7 +141,8 @@ public class BrokerStartup {
                     + " variable in your environment to match the location of the RocketMQ installation");
                 System.exit(-2);
             }
-
+            brokerConfig.setNamesrvAddr("127.0.0.1:9876");
+            //校验namesrv地址
             String namesrvAddr = brokerConfig.getNamesrvAddr();
             if (null != namesrvAddr) {
                 try {
@@ -157,9 +161,11 @@ public class BrokerStartup {
             switch (messageStoreConfig.getBrokerRole()) {
                 case ASYNC_MASTER:
                 case SYNC_MASTER:
+                    //master角色氢brokerId设为0
                     brokerConfig.setBrokerId(MixAll.MASTER_ID);
                     break;
                 case SLAVE:
+                    //slave角色brokerId不能为小于或等于0
                     if (brokerConfig.getBrokerId() <= 0) {
                         System.out.printf("Slave's brokerId must be > 0");
                         System.exit(-3);
@@ -169,7 +175,7 @@ public class BrokerStartup {
                 default:
                     break;
             }
-
+            //主从数据同步端口
             messageStoreConfig.setHaListenPort(nettyServerConfig.getListenPort() + 1);
             LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
             JoranConfigurator configurator = new JoranConfigurator();
@@ -193,7 +199,7 @@ public class BrokerStartup {
                 System.exit(0);
             }
 
-            log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
+//            log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
             MixAll.printObjectProperties(log, brokerConfig);
             MixAll.printObjectProperties(log, nettyServerConfig);
             MixAll.printObjectProperties(log, nettyClientConfig);

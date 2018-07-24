@@ -24,7 +24,7 @@ public class QueueData implements Comparable<QueueData> {
     private String brokerName;
     private int readQueueNums;
     private int writeQueueNums;
-    private int perm;
+    private int perm;//这个是什么？
     private int topicSynFlag;
 
     public int getReadQueueNums() {
