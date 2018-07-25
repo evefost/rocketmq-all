@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.namesrv.routeinfo;
 
+import com.alibaba.fastjson.JSON;
 import io.netty.channel.Channel;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -356,8 +357,9 @@ public class RouteInfoManager {
             }
         }
     }
-
+     //通过主题获取主题路由信息
     public TopicRouteData pickupTopicRouteData(final String topic) {
+        log.info("获取主题{}路由信息",topic);
         TopicRouteData topicRouteData = new TopicRouteData();
         boolean foundQueueData = false;
         boolean foundBrokerData = false;
@@ -408,6 +410,7 @@ public class RouteInfoManager {
         }
 
         if (foundBrokerData && foundQueueData) {
+            log.info("获取到的topic:{}--由路信息:\n{}",topic, JSON.toJSONString(topicRouteData,true));
             return topicRouteData;
         }
 
