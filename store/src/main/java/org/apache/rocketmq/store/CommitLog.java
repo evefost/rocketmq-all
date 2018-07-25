@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * 实时执行，真正的I/O写入磁盘操作, 要求是实时的（当然，有时候只是写入内存，定时刷盘）；
  * Store all metadata downtime for recovery, data protection reliability
  */
 public class CommitLog {
@@ -533,6 +534,7 @@ public class CommitLog {
         int queueId = msg.getQueueId();
 
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
+        //好像事务相关的，已弃用
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
             // Delay Delivery
@@ -556,6 +558,8 @@ public class CommitLog {
 
         long eclipseTimeInLock = 0;
         MappedFile unlockMappedFile = null;
+        //所有的消息到本地文件。这个文件就是 MappedFile,每一个文件对应一个MappedFile.默认情况下大小位1g
+        //获取最后一个mappe file ,然后把数据写到该文件上
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
 
         putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
@@ -568,6 +572,7 @@ public class CommitLog {
             msg.setStoreTimestamp(beginLockTimestamp);
 
             if (null == mappedFile || mappedFile.isFull()) {
+                //多线程写last mapperFile有可能未创建或已满
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
             }
             if (null == mappedFile) {
@@ -575,7 +580,7 @@ public class CommitLog {
                 beginTimeInLock = 0;
                 return new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null);
             }
-
+            //获取或创建最后最新的mapperfile,准备添加数据
             result = mappedFile.appendMessage(msg, this.appendMessageCallback);
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -623,8 +628,9 @@ public class CommitLog {
         // Statistics
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).incrementAndGet();
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).addAndGet(result.getWroteBytes());
-
+        //处理刷盘
         handleDiskFlush(result, putMessageResult, msg);
+        //处理同步到slave
         handleHA(result, putMessageResult, msg);
 
         return putMessageResult;

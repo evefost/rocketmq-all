@@ -133,7 +133,7 @@ public class NamesrvStartup {
             String tip = "The Name Server boot success. serializeType=" + RemotingCommand.getSerializeTypeConfigInThisServer();
             log.info(tip);
             System.out.printf(tip + "%n");
-            log.info("nameserver 启动成功");
+            log.info("nameserver 启动成功port:{}",nettyServerConfig.getListenPort());
             return controller;
         } catch (Throwable e) {
             e.printStackTrace();

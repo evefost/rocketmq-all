@@ -24,6 +24,9 @@ import org.apache.rocketmq.store.config.StorePathConfigHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 后台非实时执行，根据CommitLog，生成ConsumeQueue的信息，其记录了每个queue的物理commitOffset和逻辑logicOffset的信息；
+ */
 public class ConsumeQueue {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 

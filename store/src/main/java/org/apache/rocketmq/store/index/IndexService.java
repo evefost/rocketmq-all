@@ -33,6 +33,9 @@ import org.apache.rocketmq.store.config.StorePathConfigHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 后台非实时执行，如果发送消息的propety字段里面有keys字段，那么会将他以空格为分隔符，生成key和对应的index信息；
+ */
 public class IndexService {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     /**

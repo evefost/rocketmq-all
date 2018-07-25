@@ -713,6 +713,7 @@ public class BrokerController {
             //???
             this.brokerFastFailure.start();
         }
+        log.info("broker 启动成功:{}",nettyServerConfig.getListenPort());
     }
 
     public synchronized void registerBrokerAll(final boolean checkOrderConfig, boolean oneway) {

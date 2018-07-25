@@ -70,6 +70,7 @@ public class BrokerStartup {
             }
 
             log.info(tip);
+
             return controller;
         } catch (Throwable e) {
             e.printStackTrace();
