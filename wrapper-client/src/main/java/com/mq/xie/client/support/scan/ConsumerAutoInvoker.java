@@ -13,13 +13,15 @@ import org.springframework.util.StringUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 
 
-//@Component
-//@ConditionalOnProperty(prefix = PREFIX, value = "consumer.enable", matchIfMissing = true)
 public class ConsumerAutoInvoker implements ApplicationContextAware ,InitializingBean{
 
     protected final Logger logger = LoggerFactory.getLogger(ConsumerAutoInvoker.class);
+
+    private Map<Class,Object> subscribleBeans = new HashMap<>();
 
     @Autowired
     private VirtualPointInfo consumerInfo;
@@ -37,7 +39,7 @@ public class ConsumerAutoInvoker implements ApplicationContextAware ,Initializin
         MethodInfo methodInfo = consumerInfo.getMethodInfo(key);
         if (methodInfo != null) {
             logger.info("{} 自动匹配到业务代码", key);
-            Object targetBean = applicationContext.getBean(methodInfo.getTargetClass());
+            Object targetBean = subscribleBeans.get(methodInfo.getTargetClass());
             Method targetMethod = methodInfo.getMethod();
             Class<?>[] parameterTypes = targetMethod.getParameterTypes();
             Object arg0 = JSON.parseObject(messageWraper.getData(), parameterTypes[0]);
@@ -57,6 +59,12 @@ public class ConsumerAutoInvoker implements ApplicationContextAware ,Initializin
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        //consumerInfo = (VirtualPointInfo) applicationContext.getBean(CONSUMER_INFO);
+        Map<String, MethodInfo> methodInfoMap = consumerInfo.getMethodInfoMap();
+        if(methodInfoMap != null && methodInfoMap.size()>0){
+            methodInfoMap.forEach((topic, methodInfo) -> {
+                Object targetBean = applicationContext.getBean(methodInfo.getTargetClass());
+                subscribleBeans.put(methodInfo.getTargetClass(),targetBean);
+            });
+        }
     }
 }

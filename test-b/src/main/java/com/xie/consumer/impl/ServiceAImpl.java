@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 /**
  * Created by xieyang on 18/7/14.
  */
-@Service
 @Consumer
 @Topic(value = "TopicA")
 public class ServiceAImpl {

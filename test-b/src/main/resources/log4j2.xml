@@ -40,9 +40,14 @@
 
 
 	<loggers>
-		<logger name="com.xie" level="debug" />
-		<logger name="RocketmqCommon" level="debug" />
-		<Root level="debug">
+		<logger name="com.xie" level="debug" additivity="false" >
+			<AppenderRef ref="Console" />
+		</logger>
+		<logger name="com.mq.xie.client" level="debug" additivity="false" >
+			<AppenderRef ref="Console" />
+		</logger>
+
+		<Root level="error">
 			<AppenderRef ref="Console" />
 			<AppenderRef ref="RollingFile" />
 		</Root >

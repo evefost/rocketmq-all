@@ -11,16 +11,12 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
 
-//
-//@Component
+
 public class MessageSender implements InnerMessageSender {
 
     private Logger logger = LoggerFactory.getLogger(MessageSender.class);
 
-
-//    @Autowired(required = false)
     private DefaultMQProducer defaultProducer;
-
 
     public MessageSender (DefaultMQProducer defaultProducer){
         this.defaultProducer = defaultProducer;

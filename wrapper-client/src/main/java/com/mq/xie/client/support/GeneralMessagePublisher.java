@@ -4,16 +4,9 @@ import com.mq.xie.client.pojo.MessageWraper;
 import com.mq.xie.client.pojo.SourceEvent;
 import org.springframework.beans.factory.annotation.Value;
 
-//
-//@Component("generalMessagePublisher")
-//@ConditionalOnProperty(prefix = PREFIX, value = "instanceName")
+
 public class GeneralMessagePublisher extends AbsMessagePublisher {
 
-
-    @Value("${spring.application.name:dufaultTop}")
-    private String applictionName;
-
-    //    @Autowired
     private InnerMessageSender messageSender;
 
     public GeneralMessagePublisher(InnerMessageSender messageSender) {

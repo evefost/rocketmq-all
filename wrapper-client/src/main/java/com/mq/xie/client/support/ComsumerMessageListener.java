@@ -30,10 +30,6 @@ public class ComsumerMessageListener implements MessageListenerConcurrently {
     @Autowired(required = false)
     protected ConsumerAutoInvoker invoker;
 
-//    public ComsumerMessageListener(ConsumerAutoInvoker invoker){
-//        this.invoker = invoker;
-//    }
-
     @Override
     public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs, ConsumeConcurrentlyContext context) {
         MessageExt msg = msgs.get(0);
