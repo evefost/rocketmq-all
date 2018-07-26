@@ -40,6 +40,7 @@ import org.apache.rocketmq.remoting.RPCHook;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
+ * 应用于多数场景，建议使用该类消费消息
  * In most scenarios, this is the mostly recommended class to consume messages.
  * </p>
  *
