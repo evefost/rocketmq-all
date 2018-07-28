@@ -81,6 +81,9 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.slf4j.Logger;
 
+/**
+ * producer功能具体的实现
+ */
 public class DefaultMQProducerImpl implements MQProducerInner {
     private final Logger log = ClientLogger.getLog();
     private final Random random = new Random();
@@ -137,20 +140,20 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     public void start() throws MQClientException {
         this.start(true);
     }
-
+    //处部启动startFactory为true,内部启动为false
     public void start(final boolean startFactory) throws MQClientException {
         switch (this.serviceState) {
-            case CREATE_JUST:
+            case CREATE_JUST://仅他建没有启动状态
                 this.serviceState = ServiceState.START_FAILED;
-
+                //检查配置
                 this.checkConfig();
 
                 if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
-
+                //创建cleint factory,
                 this.mQClientFactory = MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQProducer, rpcHook);
-
+                //注册到本地址生产表
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -162,6 +165,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());
 
                 if (startFactory) {
+                    //真正开启各种服务
                     mQClientFactory.start();
                 }
 
@@ -171,7 +175,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 break;
             case RUNNING:
             case START_FAILED:
-            case SHUTDOWN_ALREADY:
+            case SHUTDOWN_ALREADY://重复调用启方法抛出异常
                 throw new MQClientException("The producer service state not OK, maybe started once, "
                     + this.serviceState
                     + FAQUrl.suggestTodo(FAQUrl.CLIENT_SERVICE_NOT_OK),
@@ -184,12 +188,13 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     private void checkConfig() throws MQClientException {
+        //校验数名称是否合法
         Validators.checkGroup(this.defaultMQProducer.getProducerGroup());
 
         if (null == this.defaultMQProducer.getProducerGroup()) {
             throw new MQClientException("producerGroup is null", null);
         }
-
+        //不能使用默认的组名称
         if (this.defaultMQProducer.getProducerGroup().equals(MixAll.DEFAULT_PRODUCER_GROUP)) {
             throw new MQClientException("producerGroup can not equal " + MixAll.DEFAULT_PRODUCER_GROUP + ", please specify another one.",
                 null);
